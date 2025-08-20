@@ -92,6 +92,7 @@ class DropdownButton2<T> extends StatefulWidget {
   const DropdownButton2({
     super.key,
     required this.items,
+    this.selectedValue,
     this.selectedItemBuilder,
     this.valueListenable,
     this.multiValueListenable,
@@ -133,6 +134,7 @@ class DropdownButton2<T> extends StatefulWidget {
   const DropdownButton2._formField({
     super.key,
     required this.items,
+    this.selectedValue,
     required this.selectedItemBuilder,
     required this.valueListenable,
     required this.multiValueListenable,
@@ -174,6 +176,8 @@ class DropdownButton2<T> extends StatefulWidget {
   /// then the dropdown button will be disabled, i.e. its arrow will be
   /// displayed in grey and it will not respond to input.
   final List<DropdownItem<T>>? items;
+
+  final T? selectedValue;
 
   /// A builder to customize the dropdown buttons corresponding to the
   /// [DropdownItem]s in [items].
@@ -472,6 +476,9 @@ class _DropdownButton2State<T> extends State<DropdownButton2<T>> with WidgetsBin
   }
 
   T? get _currentValue {
+    if (null != widget.selectedValue) {
+      return widget.selectedValue;
+    }
     if (widget.valueListenable != null) {
       return widget.valueListenable!.value;
     }
@@ -504,7 +511,8 @@ class _DropdownButton2State<T> extends State<DropdownButton2<T>> with WidgetsBin
       _focusNode.addListener(_handleFocusChanged);
     }
 
-    if (widget.valueListenable != oldWidget.valueListenable ||
+    if (widget.selectedValue != oldWidget.selectedValue ||
+        widget.valueListenable != oldWidget.valueListenable ||
         widget.multiValueListenable != oldWidget.multiValueListenable) {
       _updateSelectedIndex();
       oldWidget.valueListenable?.removeListener(_updateSelectedIndex);
@@ -786,45 +794,56 @@ class _DropdownButton2State<T> extends State<DropdownButton2<T>> with WidgetsBin
 
     final buttonHeight = _buttonStyle?.height ?? (widget.isDense ? _denseButtonHeight : null);
 
-    final Widget innerItemsWidget = buttonItems.isEmpty
-        ? const SizedBox.shrink()
-        : ValueListenableBuilder(
-            valueListenable:
-                widget.valueListenable ?? widget.multiValueListenable ?? ValueNotifier(null),
-            builder: (context, _, __) {
-              _uniqueValueAssert(
-                widget.items,
-                widget.valueListenable,
-                widget.multiValueListenable,
-              );
-              Widget item = buttonItems[_selectedIndex ?? hintIndex ?? 0];
-              if (item is DropdownItem) {
-                item = item.copyWith(alignment: widget.alignment);
-              }
+    late final Widget innerItemsWidget;
+    if (buttonItems.isEmpty) {
+      innerItemsWidget = const SizedBox.shrink();
+    } else {
+      Widget builder() {
+        Widget item = buttonItems[_selectedIndex ?? hintIndex ?? 0];
+        if (item is DropdownItem) {
+          item = item.copyWith(alignment: widget.alignment);
+        }
 
-              // When both buttonHeight & buttonWidth are specified, we don't have to use IndexedStack,
-              // which enhances the performance when dealing with big items list.
-              // Note: Both buttonHeight & buttonWidth must be specified to avoid changing
-              // button's size when selecting different items, which is a bad UX.
-              return buttonHeight != null && _buttonStyle?.width != null
-                  ? Align(
-                      alignment: widget.alignment,
-                      child: item,
-                    )
-                  : IndexedStack(
-                      index: _selectedIndex ?? hintIndex,
-                      alignment: widget.alignment,
-                      children: buttonHeight != null
-                          ? buttonItems
-                          : buttonItems.map((item) {
-                              return Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[item],
-                              );
-                            }).toList(),
-                    );
-            },
-          );
+        // When both buttonHeight & buttonWidth are specified, we don't have to use IndexedStack,
+        // which enhances the performance when dealing with big items list.
+        // Note: Both buttonHeight & buttonWidth must be specified to avoid changing
+        // button's size when selecting different items, which is a bad UX.
+        return buttonHeight != null && _buttonStyle?.width != null
+            ? Align(
+                alignment: widget.alignment,
+                child: item,
+              )
+            : IndexedStack(
+                index: _selectedIndex ?? hintIndex,
+                alignment: widget.alignment,
+                children: buttonHeight != null
+                    ? buttonItems
+                    : buttonItems.map((item) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[item],
+                        );
+                      }).toList(),
+              );
+      }
+
+      final listener = widget.valueListenable ?? widget.multiValueListenable;
+      if (null != listener) {
+        innerItemsWidget = ValueListenableBuilder(
+          valueListenable: listener,
+          builder: (context, _, __) {
+            _uniqueValueAssert(
+              widget.items,
+              widget.valueListenable,
+              widget.multiValueListenable,
+            );
+            return builder();
+          },
+        );
+      } else {
+        innerItemsWidget = builder();
+      }
+    }
 
     Widget result = DefaultTextStyle(
       style: _enabled ? _textStyle! : _textStyle!.copyWith(color: Theme.of(context).disabledColor),

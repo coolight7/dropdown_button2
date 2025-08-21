@@ -22,6 +22,7 @@ class _DropdownRoute<T> extends PopupRoute<_DropdownRouteResult<T>> {
     required this.inputDecorationPadding,
     required this.searchData,
     this.dropdownSeparator,
+    this.animateDuration,
   })  : barrierColor = barrierCoversButton ? barrierColor : null,
         _altBarrierColor = barrierColor;
 
@@ -41,9 +42,10 @@ class _DropdownRoute<T> extends PopupRoute<_DropdownRouteResult<T>> {
   final EdgeInsets? inputDecorationPadding;
   final DropdownSearchData<T>? searchData;
   final DropdownSeparator<T>? dropdownSeparator;
+  final Duration? animateDuration;
 
   @override
-  Duration get transitionDuration => _kDropdownMenuDuration;
+  Duration get transitionDuration => animateDuration ?? _kDropdownMenuDuration;
 
   @override
   final bool barrierDismissible;

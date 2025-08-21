@@ -37,7 +37,6 @@ class _DropdownMenu<T> extends StatefulWidget {
 }
 
 class _DropdownMenuState<T> extends State<_DropdownMenu<T>> {
-  late final CurvedAnimation _fadeOpacity;
   late final CurvedAnimation _resize;
   late List<Widget> _children;
   late SearchMatchFn<T> _searchMatchFn;
@@ -66,15 +65,9 @@ class _DropdownMenuState<T> extends State<_DropdownMenu<T>> {
     // direction. When the route's animation reverses, if we were to recreate
     // the CurvedAnimation objects in build, we'd lose
     // CurvedAnimation._curveDirection.
-    _fadeOpacity = CurvedAnimation(
-      parent: widget.route.animation!,
-      curve: const Interval(0.0, 0.25),
-      reverseCurve: const Interval(0.75, 1.0),
-    );
     _resize = CurvedAnimation(
       parent: widget.route.animation!,
-      curve: dropdownStyle.openInterval,
-      reverseCurve: const Threshold(0.0),
+      curve: Curves.easeOutBack,
     );
     //If searchController is null, then it'll perform as a normal dropdown
     //and search functions will not be executed.
@@ -106,7 +99,6 @@ class _DropdownMenuState<T> extends State<_DropdownMenu<T>> {
 
   @override
   void dispose() {
-    _fadeOpacity.dispose();
     _resize.dispose();
     searchData?.searchController?.removeListener(_onSearchChange);
     super.dispose();
@@ -232,30 +224,26 @@ class _DropdownMenuState<T> extends State<_DropdownMenu<T>> {
       ),
     );
 
-    return FadeTransition(
-      opacity: _fadeOpacity,
-      child: CustomPaint(
-        painter: _DropdownMenuPainter(
-          color: Theme.of(context).canvasColor,
-          elevation: dropdownStyle.elevation,
-          selectedIndex: route.selectedIndex,
-          resize: _resize,
-          itemHeight: items[0].height,
-          dropdownDecoration: dropdownStyle.decoration,
-          textDirection: widget.textDirection,
-        ),
-        child: Semantics(
-          scopesRoute: true,
-          namesRoute: true,
-          explicitChildNodes: true,
-          label: localizations.popupMenuLabel,
-          child: ClipRRect(
-            //Prevent scrollbar, ripple effect & items from going beyond border boundaries when scrolling.
-            clipBehavior:
-                dropdownStyle.decoration?.borderRadius != null ? Clip.antiAlias : Clip.none,
-            borderRadius: dropdownStyle.decoration?.borderRadius ?? BorderRadius.zero,
-            child: dropdownStyle.dropdownBuilder?.call(context, dropdownMenu) ?? dropdownMenu,
-          ),
+    return CustomPaint(
+      painter: _DropdownMenuPainter(
+        color: Theme.of(context).canvasColor,
+        elevation: dropdownStyle.elevation,
+        selectedIndex: route.selectedIndex,
+        resize: _resize,
+        itemHeight: items[0].height,
+        dropdownDecoration: dropdownStyle.decoration,
+        textDirection: widget.textDirection,
+      ),
+      child: Semantics(
+        scopesRoute: true,
+        namesRoute: true,
+        explicitChildNodes: true,
+        label: localizations.popupMenuLabel,
+        child: ClipRRect(
+          //Prevent scrollbar, ripple effect & items from going beyond border boundaries when scrolling.
+          clipBehavior: dropdownStyle.decoration?.borderRadius != null ? Clip.antiAlias : Clip.none,
+          borderRadius: dropdownStyle.decoration?.borderRadius ?? BorderRadius.zero,
+          child: dropdownStyle.dropdownBuilder?.call(context, dropdownMenu) ?? dropdownMenu,
         ),
       ),
     );

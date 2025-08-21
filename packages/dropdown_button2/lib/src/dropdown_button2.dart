@@ -121,6 +121,7 @@ class DropdownButton2<T> extends StatefulWidget {
     this.barrierColor,
     this.barrierLabel,
     this.openDropdownListenable,
+    this.animateDuration,
     // When adding new arguments, consider adding similar arguments to
     // DropdownButtonFormField.
   })  : assert(
@@ -165,6 +166,7 @@ class DropdownButton2<T> extends StatefulWidget {
     required InputDecoration inputDecoration,
     required bool isEmpty,
     required bool hasError,
+    this.animateDuration,
   })  : underline = null,
         _inputDecoration = inputDecoration,
         _isEmpty = isEmpty,
@@ -178,6 +180,8 @@ class DropdownButton2<T> extends StatefulWidget {
   final List<DropdownItem<T>>? items;
 
   final T? selectedValue;
+
+  final Duration? animateDuration;
 
   /// A builder to customize the dropdown buttons corresponding to the
   /// [DropdownItem]s in [items].
@@ -659,30 +663,30 @@ class _DropdownButton2State<T> extends State<DropdownButton2<T>> with WidgetsBin
 
     assert(_dropdownRoute == null);
     _dropdownRoute = _DropdownRoute<T>(
-      items: items,
-      buttonRect: _buttonRect,
-      buttonBorderRadius: widget._inputDecoration != null
-          ? _getInputDecorationBorderRadius(widget._inputDecoration!)
-          : _getButtonBorderRadius(context),
-      selectedIndex: _selectedIndex ?? 0,
-      isNoSelectedItem: _selectedIndex == null,
-      onChanged: widget.onChanged,
-      capturedThemes: InheritedTheme.capture(from: context, to: navigator.context),
-      style: _textStyle!,
-      barrierDismissible: widget.barrierDismissible,
-      barrierColor: widget.barrierColor,
-      barrierLabel:
-          widget.barrierLabel ?? MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierCoversButton: widget.barrierCoversButton,
-      parentFocusNode: _focusNode,
-      enableFeedback: widget.enableFeedback ?? true,
-      textDirection: textDirection,
-      dropdownStyle: _dropdownStyle,
-      menuItemStyle: _menuItemStyle,
-      inputDecorationPadding: _getInputDecorationPadding(),
-      searchData: _searchData,
-      dropdownSeparator: separator,
-    );
+        items: items,
+        buttonRect: _buttonRect,
+        buttonBorderRadius: widget._inputDecoration != null
+            ? _getInputDecorationBorderRadius(widget._inputDecoration!)
+            : _getButtonBorderRadius(context),
+        selectedIndex: _selectedIndex ?? 0,
+        isNoSelectedItem: _selectedIndex == null,
+        onChanged: widget.onChanged,
+        capturedThemes: InheritedTheme.capture(from: context, to: navigator.context),
+        style: _textStyle!,
+        barrierDismissible: widget.barrierDismissible,
+        barrierColor: widget.barrierColor,
+        barrierLabel:
+            widget.barrierLabel ?? MaterialLocalizations.of(context).modalBarrierDismissLabel,
+        barrierCoversButton: widget.barrierCoversButton,
+        parentFocusNode: _focusNode,
+        enableFeedback: widget.enableFeedback ?? true,
+        textDirection: textDirection,
+        dropdownStyle: _dropdownStyle,
+        menuItemStyle: _menuItemStyle,
+        inputDecorationPadding: _getInputDecorationPadding(),
+        searchData: _searchData,
+        dropdownSeparator: separator,
+        animateDuration: widget.animateDuration);
 
     _isMenuOpen.value = true;
     _focusNode.requestFocus();

@@ -726,7 +726,7 @@ class _DropdownButton2State<T> extends State<DropdownButton2<T>> with WidgetsBin
       ));
     }
 
-    final EdgeInsetsGeometry padding = _kUnalignedButtonPadding;
+    const padding = _kUnalignedButtonPadding;
 
     final buttonHeight = _buttonStyle?.height ?? (widget.isDense ? _denseButtonHeight : null);
 

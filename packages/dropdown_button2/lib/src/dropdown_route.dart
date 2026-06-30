@@ -14,6 +14,7 @@ class _DropdownRoute<T> extends PopupRoute<_DropdownRouteResult<T>> {
     Color? barrierColor,
     this.barrierLabel,
     required this.barrierCoversButton,
+    required this.barrierBlocksInteraction,
     required this.parentFocusNode,
     required this.enableFeedback,
     required this.textDirection,
@@ -61,7 +62,32 @@ class _DropdownRoute<T> extends PopupRoute<_DropdownRouteResult<T>> {
 
   final bool barrierCoversButton;
 
+  final bool barrierBlocksInteraction;
+
   final FocusScopeNode _childNode = FocusScopeNode(debugLabel: 'Child');
+
+  /// When [barrierBlocksInteraction] is false, wraps the default modal barrier
+  /// so pointer events pass through while still dismissing on barrier tap (if dismissible).
+  @override
+  Widget buildModalBarrier() {
+    if (barrierBlocksInteraction) {
+      return super.buildModalBarrier();
+    }
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (PointerDownEvent event) {
+        if (buttonRect.value!.contains(event.position)) {
+          // Intercept anchor-button taps while the menu is open so the underlying
+          // button's GestureDetector doesn't fire onTap.
+          GestureBinding.instance.cancelPointer(event.pointer);
+        }
+        if (barrierDismissible) {
+          _dismiss();
+        }
+      },
+      child: IgnorePointer(child: super.buildModalBarrier()),
+    );
+  }
 
   @override
   Widget buildPage(BuildContext context, _, __) {
@@ -77,8 +103,9 @@ class _DropdownRoute<T> extends PopupRoute<_DropdownRouteResult<T>> {
             //This will ensure menu is drawn in the actual available height.
             final padding = MediaQuery.paddingOf(context);
             final viewInsets = MediaQuery.viewInsetsOf(context);
-            final BoxConstraints actualConstraints =
-                constraints.copyWith(maxHeight: constraints.maxHeight - viewInsets.bottom);
+            final BoxConstraints actualConstraints = constraints.copyWith(
+              maxHeight: constraints.maxHeight - viewInsets.bottom,
+            );
             final EdgeInsets mediaQueryPadding =
                 dropdownStyle.useSafeArea ? padding : EdgeInsets.zero;
             return ValueListenableBuilder<Rect?>(
@@ -119,6 +146,61 @@ class _DropdownRoute<T> extends PopupRoute<_DropdownRouteResult<T>> {
     }
   }
 
+  /// The y-position where the menu top anchors to the button:
+  /// - isOverButton: buttonRect.top (menu covers the button downward)
+  /// - default: buttonRect.bottom (menu opens below the button)
+  double _computeMenuAnchoredTop(Rect buttonRect) {
+    return dropdownStyle.isOverButton
+        ? buttonRect.top - dropdownStyle.offset.dy
+        : buttonRect.bottom - dropdownStyle.offset.dy;
+  }
+
+  /// Computes the maximum height the menu is allowed to take, bounded by:
+  /// - the available view height (via [getMenuAvailableHeight]),
+  /// - the user-specified [DropdownStyleData.maxHeight] (if any),
+  /// - the [DropdownStyleData.anchoredMinHeight] cap (if any).
+  double _computeMenuMaxHeight({
+    required double availableHeight,
+    required EdgeInsets mediaQueryPadding,
+    required double menuAnchoredTop,
+  }) {
+    double maxHeight = getMenuAvailableHeight(availableHeight, mediaQueryPadding);
+    // If a preferred MaxHeight is set by the user, use it instead of the available maxHeight.
+    if (dropdownStyle.maxHeight case final double preferredMaxHeight) {
+      maxHeight = math.min(maxHeight, preferredMaxHeight);
+    }
+    if (dropdownStyle.anchoredMinHeight case final double anchoredMinHeight) {
+      maxHeight = _applyAnchoredMinHeightCap(
+        height: maxHeight,
+        anchoredMinHeight: anchoredMinHeight,
+        menuAnchoredTop: menuAnchoredTop,
+        bottomLimit: availableHeight - mediaQueryPadding.bottom,
+      );
+    }
+    return maxHeight;
+  }
+
+  /// Applies the [anchoredMinHeight] cap to [height]:
+  /// - If there's enough space below the button (>= [anchoredMinHeight]), shrink the
+  ///   menu height to fit that space so it stays anchored to the button.
+  /// - Otherwise, fall back to the default repositioning within the available space
+  ///   but cap the menu height at [anchoredMinHeight].
+  double _applyAnchoredMinHeightCap({
+    required double height,
+    required double anchoredMinHeight,
+    required double menuAnchoredTop,
+    required double bottomLimit,
+  }) {
+    // Space available between the button and the bottom limit.
+    final double spaceBelow = bottomLimit - menuAnchoredTop;
+    // Height cap: use the larger of:
+    // - spaceBelow (when sufficient to stay anchored)
+    // - anchoredMinHeight (when insufficient — fall back to repositioning)
+    final double heightCap = math.max(spaceBelow, anchoredMinHeight);
+    // Apply the cap: shrink height only if it exceeds heightCap.
+    return math.min(height, heightCap);
+  }
+
   double _itemHeightWithSeparator(int itemIndex) {
     final itemHeight = items[itemIndex].height;
     final separatorHeight = dropdownSeparator?.height ?? 0;
@@ -130,7 +212,7 @@ class _DropdownRoute<T> extends PopupRoute<_DropdownRouteResult<T>> {
     bool Function(DropdownItem<T> item)? itemPredicate,
   }) {
     var itemsHeight = 0.0;
-    for (int i = 0; i < index; i++) {
+    for (var i = 0; i < index; i++) {
       if (itemPredicate == null || itemPredicate(items[i])) {
         itemsHeight += _itemHeightWithSeparator(i);
       }
@@ -142,7 +224,7 @@ class _DropdownRoute<T> extends PopupRoute<_DropdownRouteResult<T>> {
     final double paddingTop = dropdownStyle.padding != null
         ? dropdownStyle.padding!.resolve(null).top
         : kMaterialListPadding.top;
-    double offset = paddingTop;
+    var offset = paddingTop;
 
     if (items.isNotEmpty && index > 0) {
       if (searchData?.searchController?.text case final searchText?) {
@@ -175,12 +257,12 @@ class _DropdownRoute<T> extends PopupRoute<_DropdownRouteResult<T>> {
     EdgeInsets mediaQueryPadding,
     int index,
   ) {
-    double maxHeight = getMenuAvailableHeight(availableHeight, mediaQueryPadding);
-    // If a preferred MaxHeight is set by the user, use it instead of the available maxHeight.
-    final double? preferredMaxHeight = dropdownStyle.maxHeight;
-    if (preferredMaxHeight != null) {
-      maxHeight = math.min(maxHeight, preferredMaxHeight);
-    }
+    final double menuAnchoredTop = _computeMenuAnchoredTop(buttonRect);
+    final double maxHeight = _computeMenuMaxHeight(
+      availableHeight: availableHeight,
+      mediaQueryPadding: mediaQueryPadding,
+      menuAnchoredTop: menuAnchoredTop,
+    );
 
     double actualMenuHeight = dropdownStyle.padding?.vertical ?? kMaterialListPadding.vertical;
     final double innerWidgetHeight = searchData?.searchBarWidgetHeight ?? 0.0;
@@ -198,9 +280,7 @@ class _DropdownRoute<T> extends PopupRoute<_DropdownRouteResult<T>> {
     final double menuHeight = math.min(maxHeight, actualMenuHeight);
 
     // The computed top and bottom of the menu
-    double menuTop = dropdownStyle.isOverButton
-        ? buttonRect.top - dropdownStyle.offset.dy
-        : buttonRect.bottom - dropdownStyle.offset.dy;
+    var menuTop = menuAnchoredTop;
     double menuBottom = menuTop + menuHeight;
 
     // If the computed top or bottom of the menu are outside of the range
@@ -292,11 +372,10 @@ class _DropdownRoutePageState<T> extends State<_DropdownRoutePage<T>> {
   void initState() {
     super.initState();
     // Computing the initialScrollOffset now, before the items have been laid
-    // out. This only works if the item heights are effectively fixed, i.e. either
-    // DropdownButton.itemHeight is specified or DropdownButton.itemHeight is null
-    // and all of the items' intrinsic heights are less than _kMenuItemHeight.
-    // Otherwise the initialScrollOffset is just a rough approximation based on
-    // treating the items as if their heights were all equal to _kMenuItemHeight.
+    // out. This is accurate only if no item sets [DropdownItem.intrinsicHeight]
+    // to true. When an item uses an intrinsic height, the offset is just a
+    // rough approximation that uses the declared [DropdownItem.height] as a
+    // fallback, since the actual height can't be known until layout.
     final _MenuLimits menuLimits = widget.route.getMenuLimits(
       widget.buttonRect,
       widget.constraints.maxHeight,
@@ -368,11 +447,12 @@ class _DropdownMenuRouteLayout<T> extends SingleChildLayoutDelegate {
 
   @override
   BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
-    double maxHeight = route.getMenuAvailableHeight(availableHeight, mediaQueryPadding);
-    final double? preferredMaxHeight = route.dropdownStyle.maxHeight;
-    if (preferredMaxHeight != null && preferredMaxHeight <= maxHeight) {
-      maxHeight = preferredMaxHeight;
-    }
+    final double menuAnchoredTop = route._computeMenuAnchoredTop(buttonRect);
+    final double maxHeight = route._computeMenuMaxHeight(
+      availableHeight: availableHeight,
+      menuAnchoredTop: menuAnchoredTop,
+      mediaQueryPadding: mediaQueryPadding,
+    );
     // The width of a menu should be at most the view width. This ensures that
     // the menu does not extend past the left and right edges of the screen.
     final double? menuWidth = route.dropdownStyle.width;
@@ -553,7 +633,7 @@ class _DropdownBarrierPainter extends CustomPainter {
       canvas.saveLayer(pageRect, Paint());
       canvas.drawRect(pageRect, Paint()..color = barrierColor!);
 
-      final RRect buttonRRect = RRect.fromRectAndCorners(
+      final buttonRRect = RRect.fromRectAndCorners(
         buttonRect,
         topLeft: buttonBorderRadius.topLeft,
         topRight: buttonBorderRadius.topRight,

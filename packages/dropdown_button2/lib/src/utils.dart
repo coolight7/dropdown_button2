@@ -3,14 +3,14 @@ part of 'dropdown_button2.dart';
 void _uniqueValueAssert<T>(
   List<DropdownItem<T>>? items,
   ValueListenable<T?>? valueListenable,
-  ValueListenable<List<T>>? multiValueListenable,
+  ValueListenable<Iterable<T>>? multiValueListenable,
 ) {
   if (items == null || items.isEmpty) {
     return;
   }
 
   String assertMessage(T value) {
-    return "There should be exactly one item with [DropdownButton]'s value: "
+    return "There should be exactly one item with [DropdownButton2]'s value: "
         '$value. \n'
         'Either zero or 2 or more [DropdownItem]s were detected '
         'with the same value';

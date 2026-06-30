@@ -2,23 +2,30 @@ name: Build
 
 on:
   push:
-    branches: [master, main]
+    branches: [ master, main ]
     paths-ignore:
       - "**.md"
   pull_request:
     paths-ignore:
       - "**.md"
+  schedule:
+    # Run daily at 03:00 UTC to catch regressions from new Flutter releases
+    # (scheduled workflows only run on the default branch).
+    - cron: "0 3 * * *"
 
 jobs:
   build:
     name: Run flutter test and analyze
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        channel:
-          - stable
+        include:
+          # Minimum supported version (keep in sync with pubspec.yaml).
+          - flutter-version: "3.32.0"
+          - channel: stable
           # We'll add master after migrating to Melos 7.x.x and flutter workspaces
-          # - master
+          # - channel: master
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,6 +33,7 @@ jobs:
       - name: Setup Flutter environment
         uses: subosito/flutter-action@v2.7.1
         with:
+          flutter-version: ${{ matrix.flutter-version }}
           channel: ${{ matrix.channel }}
 
       - name: Set environment paths
@@ -40,8 +48,7 @@ jobs:
           melos bootstrap
 
       - name: Verify formatting
-        # Remove --line-length=100 when upgrading the min dart sdk to at least 3.7
-        run: melos exec dart format --output=none --set-exit-if-changed --line-length=100 .
+        run: melos exec dart format --output=none --set-exit-if-changed .
 
       # Consider passing '--fatal-infos' for slightly stricter analysis.
       - name: Run flutter analyze

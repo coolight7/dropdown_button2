@@ -184,15 +184,6 @@ class _DropdownMenuState<T> extends State<_DropdownMenu<T>> {
                             itemExtentBuilder: _hasIntrinsicHeight
                                 ? null
                                 : (index, dimensions) {
-                                    final childrenLength = separator == null
-                                        ? _children.length
-                                        : SeparatedSliverChildBuilderDelegate
-                                            .computeActualChildCount(_children.length);
-                                    // TODO(Ahmed): Remove this when https://github.com/flutter/flutter/pull/142428
-                                    // is supported by the min version of the package [Flutter>=3.22.0].
-                                    if (index >= childrenLength) {
-                                      return 100;
-                                    }
                                     return separator == null
                                         ? route.items[index].height
                                         : index.isOdd
@@ -235,6 +226,7 @@ class _DropdownMenuState<T> extends State<_DropdownMenu<T>> {
         textDirection: widget.textDirection,
       ),
       child: Semantics(
+        role: SemanticsRole.menu,
         scopesRoute: true,
         namesRoute: true,
         explicitChildNodes: true,
@@ -287,19 +279,19 @@ class _DropdownMenuPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Tween<double> top = Tween<double>(
+    final top = Tween<double>(
       //Begin at 0.0 instead of selectedItemOffset so that the menu open animation
       //always start from top to bottom instead of starting from the selected item
       begin: 0.0,
       end: 0.0,
     );
 
-    final Tween<double> bottom = Tween<double>(
+    final bottom = Tween<double>(
       begin: clampDouble(top.begin! + itemHeight, math.min(itemHeight, size.height), size.height),
       end: size.height,
     );
 
-    final Rect rect = Rect.fromLTRB(0.0, top.evaluate(resize), size.width, bottom.evaluate(resize));
+    final rect = Rect.fromLTRB(0.0, top.evaluate(resize), size.width, bottom.evaluate(resize));
 
     _painter.paint(
       canvas,
